@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Robot Grid</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fafafa;
+      color: #222;
+      min-height: 100vh;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      max-width: 600px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #000;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    /* --- grid size controls --- */
+    .grid-size-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .grid-size-row label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .dim-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dim-group input {
+      width: 52px;
+      font-family: inherit;
+      font-size: 14px;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      text-align: center;
+      color: #222;
+      transition: border-color 0.15s;
+    }
+
+    .dim-group input:focus {
+      outline: none;
+      border-color: #999;
+    }
+
+    .dim-group span {
+      font-size: 13px;
+      color: #999;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+      background: white;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      touch-action: none;
+      display: block;
+    }
+
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      background: white;
+      color: #222;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex: 1;
+    }
+
+    button:hover:not(:disabled) {
+      background: #f5f5f5;
+      border-color: #bbb;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background: #000;
+      color: white;
+      border-color: #000;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: #222;
+    }
+
+    .info {
+      margin-top: 20px;
+      padding: 16px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+
+    .status-dot.connected { background: #22c55e; }
+    .status-dot.error      { background: #ef4444; }
+
+    .response {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 11px;
+      color: #666;
+      background: #f9f9f9;
+      padding: 12px;
+      border-radius: 3px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #666;
+      padding: 8px 0;
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Robot Grid</h1>
+    <p class="subtitle">Click or drag cells to fill, then send to robot</p>
+
+    <!-- grid dimension controls -->
+    <div class="grid-size-row">
+      <label>Grid size:</label>
+      <div class="dim-group">
+        <input type="number" id="rowsInput" min="1" max="64" value="8" />
+        <span>rows</span>
+      </div>
+      <span style="color:#bbb">×</span>
+      <div class="dim-group">
+        <input type="number" id="colsInput" min="1" max="64" value="8" />
+        <span>cols</span>
+      </div>
+    </div>
+
+    <canvas id="drawCanvas" width="640" height="640"></canvas>
+
+    <div class="controls">
+      <div class="button-row">
+        <button id="clearBtn">Clear</button>
+        <button id="sendBtn" class="primary">Send to Robot</button>
+      </div>
+
+      <label class="mode-toggle">
+        <input id="binaryMode" type="checkbox" checked />
+        <span>Click mode (uncheck to draw freely)</span>
+      </label>
+
+      <div id="drawControls" class="hidden">
+        <label class="mode-toggle">
+          <input id="snapGrid" type="checkbox" />
+          <span>Show grid overlay</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="info">
+      <div class="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Checking connection...</span>
+      </div>
+      <div class="response" id="responseOutput">Ready. Click or drag cells and press "Send to Robot"</div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------------------------------------------------------
+    // Config
+    // ---------------------------------------------------------------------------
+    const API_BASE = "http://localhost:8080";
+
+    // ---------------------------------------------------------------------------
+    // Canvas & state
+    // ---------------------------------------------------------------------------
+    const canvas   = document.getElementById("drawCanvas");
+    const ctx      = canvas.getContext("2d");
+
+    let GRID_ROWS = 8;
+    let GRID_COLS = 8;
+
+    let filledCells = new Set();   // "row,col" keys
+
+    // drag state (binary mode)
+    let isDragging  = false;
+    let dragAction  = null;        // "fill" | "erase"
+
+    // free-draw state
+    let isDrawing   = false;
+    let lastPos     = null;
+
+    // ---------------------------------------------------------------------------
+    // UI refs
+    // ---------------------------------------------------------------------------
+    const rowsInput      = document.getElementById("rowsInput");
+    const colsInput      = document.getElementById("colsInput");
+    const binaryMode     = document.getElementById("binaryMode");
+    const snapGrid       = document.getElementById("snapGrid");
+    const statusDot      = document.getElementById("statusDot");
+    const statusText     = document.getElementById("statusText");
+    const responseOutput = document.getElementById("responseOutput");
+    const drawControls   = document.getElementById("drawControls");
+
+    // ---------------------------------------------------------------------------
+    // Grid size change handler
+    // ---------------------------------------------------------------------------
+    function clamp(val, lo, hi) { return Math.max(lo, Math.min(hi, val)); }
+
+    function onGridSizeChange() {
+      const newRows = clamp(parseInt(rowsInput.value, 10) || 1, 1, 64);
+      const newCols = clamp(parseInt(colsInput.value, 10) || 1, 1, 64);
+
+      if (newRows === GRID_ROWS && newCols === GRID_COLS) return;
+
+      GRID_ROWS = newRows;
+      GRID_COLS = newCols;
+      rowsInput.value = GRID_ROWS;
+      colsInput.value = GRID_COLS;
+
+      // Wipe selection on resize
+      filledCells.clear();
+
+      if (binaryMode.checked) {
+        renderBinaryGrid();
+      } else {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    rowsInput.addEventListener("change", onGridSizeChange);
+    colsInput.addEventListener("change", onGridSizeChange);
+    rowsInput.addEventListener("input",  onGridSizeChange);
+    colsInput.addEventListener("input",  onGridSizeChange);
+
+    // ---------------------------------------------------------------------------
+    // Mode toggle
+    // ---------------------------------------------------------------------------
+    binaryMode.addEventListener("change", () => {
+      if (binaryMode.checked) {
+        canvas.style.cursor = "pointer";
+        drawControls.classList.add("hidden");
+        renderBinaryGrid();
+      } else {
+        canvas.style.cursor = "crosshair";
+        drawControls.classList.remove("hidden");
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        filledCells.clear();
+      }
+    });
+
+    // ---------------------------------------------------------------------------
+    // Position helpers
+    // ---------------------------------------------------------------------------
+    function getCanvasPosition(event) {
+      const rect   = canvas.getBoundingClientRect();
+      const scaleX = canvas.width  / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const touch  = event.touches?.[0];
+      const cx     = touch ? touch.clientX : event.clientX;
+      const cy     = touch ? touch.clientY : event.clientY;
+      return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY };
+    }
+
+    function getCellFromPosition(x, y) {
+      const col = Math.floor(x / (canvas.width  / GRID_COLS));
+      const row = Math.floor(y / (canvas.height / GRID_ROWS));
+      return {
+        row: Math.min(row, GRID_ROWS - 1),
+        col: Math.min(col, GRID_COLS - 1)
+      };
+    }
+
+    // ---------------------------------------------------------------------------
+    // Binary grid rendering
+    // ---------------------------------------------------------------------------
+    function renderBinaryGrid() {
+      const cellW = canvas.width  / GRID_COLS;
+      const cellH = canvas.height / GRID_ROWS;
+
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // filled cells
+      ctx.fillStyle = "#000";
+      filledCells.forEach(key => {
+        const [r, c] = key.split(",").map(Number);
+        ctx.fillRect(c * cellW, r * cellH, cellW, cellH);
+      });
+
+      // grid lines
+      ctx.strokeStyle = "#ddd";
+      ctx.lineWidth = 1;
+
+      for (let i = 0; i <= GRID_COLS; i++) {
+        const x = (canvas.width * i) / GRID_COLS;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let j = 0; j <= GRID_ROWS; j++) {
+        const y = (canvas.height * j) / GRID_ROWS;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);  ctx.stroke();
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Drag fill / erase (binary mode)
+    // ---------------------------------------------------------------------------
+    function applyDragToCell(x, y) {
+      const { row, col } = getCellFromPosition(x, y);
+      const key = `${row},${col}`;
+      if (dragAction === "fill") filledCells.add(key);
+      else                        filledCells.delete(key);
+      renderBinaryGrid();
+    }
+
+    // ---------------------------------------------------------------------------
+    // Free-draw helpers
+    // ---------------------------------------------------------------------------
+    function drawLine(from, to) {
+      ctx.strokeStyle = "black";
+      ctx.lineWidth   = 8;
+      ctx.lineCap     = "round";
+      ctx.lineJoin    = "round";
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x,   to.y);
+      ctx.stroke();
+    }
+
+    function renderGridOverlay() {
+      ctx.save();
+      ctx.strokeStyle = "rgba(0,0,0,0.1)";
+      ctx.lineWidth   = 1;
+      for (let i = 1; i < GRID_COLS; i++) {
+        const x = (canvas.width * i) / GRID_COLS;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let j = 1; j < GRID_ROWS; j++) {
+        const y = (canvas.height * j) / GRID_ROWS;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // ---------------------------------------------------------------------------
+    // Pointer / touch event handlers
+    // ---------------------------------------------------------------------------
+    function startDrawing(event) {
+      event.preventDefault();
+      const pos = getCanvasPosition(event);
+
+      if (binaryMode.checked) {
+        const { row, col } = getCellFromPosition(pos.x, pos.y);
+        const key = `${row},${col}`;
+        dragAction  = filledCells.has(key) ? "erase" : "fill";
+        isDragging  = true;
+        applyDragToCell(pos.x, pos.y);
+      } else {
+        isDrawing = true;
+        lastPos   = pos;
+      }
+    }
+
+    function onMove(event) {
+      event.preventDefault();
+      const pos = getCanvasPosition(event);
+
+      if (binaryMode.checked) {
+        if (!isDragging) return;
+        applyDragToCell(pos.x, pos.y);
+      } else {
+        if (!isDrawing) return;
+        drawLine(lastPos, pos);
+        lastPos = pos;
+        if (snapGrid.checked) renderGridOverlay();
+      }
+    }
+
+    function stopDrawing(event) {
+      event.preventDefault();
+      if (binaryMode.checked) {
+        isDragging = false;
+        dragAction = null;
+      } else {
+        isDrawing = false;
+        lastPos   = null;
+        if (snapGrid.checked) renderGridOverlay();
+      }
+    }
+
+    canvas.addEventListener("mousedown",  startDrawing);
+    canvas.addEventListener("mousemove",  onMove);
+    window.addEventListener("mouseup",    stopDrawing);
+
+    canvas.addEventListener("touchstart", startDrawing, { passive: false });
+    canvas.addEventListener("touchmove",  onMove,       { passive: false });
+    window.addEventListener("touchend",   stopDrawing,  { passive: false });
+
+    // ---------------------------------------------------------------------------
+    // Clear
+    // ---------------------------------------------------------------------------
+    document.getElementById("clearBtn").onclick = () => {
+      filledCells.clear();
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (binaryMode.checked) renderBinaryGrid();
+      responseOutput.textContent = "Canvas cleared. Ready for new input.";
+    };
+
+    // ---------------------------------------------------------------------------
+    // Send to robot
+    // ---------------------------------------------------------------------------
+    document.getElementById("sendBtn").onclick = async () => {
+      const btn = document.getElementById("sendBtn");
+      btn.disabled    = true;
+      btn.textContent = "Sending...";
+
+      try {
+        if (binaryMode.checked) {
+          // --- binary mode: send cells directly to /execute ---
+          const cells = Array.from(filledCells).map(key => {
+            const [row, col] = key.split(",").map(Number);
+            return { row, col };
+          });
+
+          const payload = { cells, grid_rows: GRID_ROWS, grid_cols: GRID_COLS };
+          responseOutput.textContent = JSON.stringify(payload, null, 2);
+
+          if (cells.length > 0) {
+            const res  = await fetch(`${API_BASE}/execute`, {
+              method:  "POST",
+              headers: { "Content-Type": "application/json" },
+              body:    JSON.stringify(payload)
+            });
+            const data = await res.json();
+            responseOutput.textContent =
+              JSON.stringify(payload, null, 2) +
+              "\n\n→ backend: " + JSON.stringify(data);
+          }
+
+          setStatus("connected", "Connected");
+
+        } else {
+          // --- free-draw mode: /plan then /execute ---
+          const imageBase64 = canvas.toDataURL("image/png");
+
+          const planRes  = await fetch(`${API_BASE}/plan`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              image_b64: imageBase64,
+              grid_rows: GRID_ROWS,
+              grid_cols: GRID_COLS
+            })
+          });
+          const planData = await planRes.json();
+          responseOutput.textContent = JSON.stringify(planData, null, 2);
+
+          if (planData.cells && planData.cells.length > 0) {
+            const execRes  = await fetch(`${API_BASE}/execute`, {
+              method:  "POST",
+              headers: { "Content-Type": "application/json" },
+              body:    JSON.stringify({
+                cells:     planData.cells,
+                grid_rows: GRID_ROWS,
+                grid_cols: GRID_COLS
+              })
+            });
+            const execData = await execRes.json();
+            responseOutput.textContent =
+              JSON.stringify(planData, null, 2) +
+              "\n\n→ backend: " + JSON.stringify(execData);
+          }
+
+          setStatus("connected", "Connected");
+        }
+      } catch (error) {
+        responseOutput.textContent = `Error: ${error.message}`;
+        setStatus("error", "Connection failed");
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = "Send to Robot";
+      }
+    };
+
+    // ---------------------------------------------------------------------------
+    // Status / health
+    // ---------------------------------------------------------------------------
+    function setStatus(state, message) {
+      statusDot.className    = `status-dot ${state}`;
+      statusText.textContent = message;
+    }
+
+    async function checkConnection() {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        setStatus(res.ok ? "connected" : "error", res.ok ? "Connected" : "Backend error");
+      } catch {
+        setStatus("error", "Backend offline");
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Init
+    // ---------------------------------------------------------------------------
+    checkConnection();
+    setInterval(checkConnection, 10000);
+    renderBinaryGrid();
+    canvas.style.cursor = "pointer";
+  </script>
+</body>
+</html>
